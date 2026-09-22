@@ -1,0 +1,9 @@
+#SBATCH --account=burst
+#SBATCH --qos=burst
+#SBATCH --partition=all
+#SBATCH --job-name=
+#SBATCH --time=2-00:00:00
+#SBATCH --nodes=1 --ntasks-per-node=cpu --mem=6G
+#SBATCH --gres=gpu:0 --gpu-bind=closest
+#SBATCH --output=slurm-%j.out
+#SBATCH --error=slurm-%j.err

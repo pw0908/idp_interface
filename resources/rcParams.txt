@@ -1,0 +1,25 @@
+rcParams = PyDict(plt.matplotlib["rcParams"])
+
+WIDTH = 1.5 * 8.3 / 2.54
+DOUBLE_WIDTH = 1.5 * 17.1 / 2.54
+DPI = 150
+rcParams["axes.labelsize"]= 16
+rcParams["axes.xmargin"]= 0
+rcParams["axes.ymargin"]= .1
+rcParams["lines.markersize"]= 5
+rcParams["figure.dpi"]= DPI
+rcParams["figure.autolayout"]= true
+rcParams["figure.figsize"]= (WIDTH, 4 * WIDTH / 3)
+rcParams["figure.facecolor"]= "white"
+rcParams["font.size"]= 14
+rcParams["grid.color"]= "0"
+rcParams["grid.linestyle"]= "-"
+rcParams["legend.edgecolor"]= "1"
+rcParams["legend.fontsize"]= 12
+rcParams["xtick.labelsize"]= 14
+rcParams["ytick.labelsize"]= 14
+rcParams["font.family"]= "serif"
+rcParams["font.sans-serif"]= ["Helvetica"]
+rcParams["text.usetex"]=true
+
+rcParams["axes.prop_cycle"] = plt.matplotlib.cycler(color=["#4063D8","#009B72","#FFB400","#D80032","#9558B2","#808080"]);
