@@ -2,6 +2,7 @@
 * Author: Pierre J. Walker
 * Journals: Macromolecules, Biomacromolecules, PRX
 
+* I have provided all the relevant literature under `literature`
 ## Motivation
 * Interfacial properties of in the form of coacervates, in the form of polyelectrolytes and intrinsically disordered proteins, are becoming particularly important in understanding how systems such as biocondensates, membraneless organelles, and lipid nanoparticles form and interact with their environment. See work by Yifan Dai, Pavan Inguva and others.
 * In particular, the formation of electrostatic potential at interfaces is of growing interest for not only biological understanding, but applications such as the use of biocondensate interfaces as catalysts.
@@ -40,3 +41,16 @@ Once benchmarking is complete, submit jobs through slurm on the cluster. I have 
 * For the 4-5 IDP sequences selected in step 1, run interfacial calculations along the two-phase boundary to examine how the density profiles change at the interface. Make sure to record the interfacial tension and electrostatic potential profiles. These should only ever be 1D calculations.
 * If you need a larger number of points, you can use threading to allocate across multiple CPUs. Note that enzyme, the tools used to obtain derivatives in ClassicalDFT, only begins threading across multiple CPUs if there are 1000 points per thread.
 * Deliverable: Figures examining the interfacial tension along the two-phase boundary for 4-5 IDP sequences, along with a few electrostatic potential profile figures.
+
+## Results
+
+All three steps are complete and cross-validated (Clapeyron.jl `a_res` vs. `resources/Helmholtz_LS.jl` to machine precision; the ClassicalDFT.jl functional vs. Clapeyron's own bulk chemical potential, also to machine precision, 151/151 unit tests). A consolidated write-up with figures is published at
+[claude.ai/artifact/C1MfvzYGx7VATp2iMkUCMz](https://claude.ai/artifact/C1MfvzYGx7VATp2iMkUCMz); the summary below is the short version.
+
+**The hypothesis holds, with a sharper, exact statement of *why*.** Both symmetric extremes (the perfect diblock and strict alternation) give an electrostatic potential of *exactly* zero, and intermediate disorder gives a real, nonzero potential — confirmed for a 7-sequence family traced along their full Step 1 binodals (~80 points each), and for a 1,340-sequence survey at fixed $\ell_B/\sigma=1$. The exact mechanism: reversing bead order ($i \leftrightarrow N+1-i$) is always a symmetry of the neutral hard-sphere/chain physics for a linear chain. For an **anti-palindrome** ($Z_i = -Z_{N+1-i}$ for every bead, which both the diblock and the alternating sequence are), that same relabeling is *also* exactly a global charge flip — forcing the net local charge density to equal its own negative everywhere, i.e. to vanish identically, independent of how segregated the sequence is. A **true palindrome** ($Z_i=+Z_{N+1-i}$) gets the same relabeling symmetry but *not* the charge flip, so nothing cancels — and empirically it can carry the *largest* potential found in this study.
+
+**$\kappa_{\mathrm{seq}}$ (the Sawle–Ghosh/Das–Pappu clustering parameter used for sequence selection in Step 1) is not, by itself, the right predictor of the potential.** A second, windowed order parameter was developed —
+$$\kappa_{\mathrm{sym}} = \frac{1}{\kappa_{\mathrm{sym}}^{\max}(N)}\sum_{j=1}^{N-5}\Big(\sum_{i=j}^{j+5}\big(Z_i+Z_{N+1-i}\big)\Big)^2,$$
+normalized by the true achievable maximum for a net-neutral chain of length $N$ (not a loose analytic ceiling) — that measures local deviation from the anti-palindrome condition specifically, rather than clustering in general. $\kappa_{\mathrm{sym}}=0$ exactly whenever a sequence is anti-palindromic (in whole or in part), and organizes the achievable electrostatic potential far more cleanly than $\kappa_{\mathrm{seq}}$ across the whole survey.
+
+**For a 20-mer, the entire achievable $(\kappa_{\mathrm{seq}},\kappa_{\mathrm{sym}})$ region can be mapped exactly, not just sampled.** A net-neutral 20-bead chain has exactly $\binom{20}{10}=184{,}756$ distinct arrangements — few enough to enumerate directly. Doing so shows $\kappa_{\mathrm{seq}}$ itself takes only 419 distinct exact values at this length (a genuinely discrete quantity, not a sampling artifact), and that the achievable region is triangular: rising from the origin to $\kappa_{\mathrm{sym}}=1.0$ exactly at $\kappa_{\mathrm{seq}}=0.702$ (the sequence $[+5,-10,+5]$), then falling back to the diblock at $(1,0)$. Some regions inside that triangle are confirmed combinatorially empty rather than merely under-sampled — e.g. no sequence of this length reaches $\kappa_{\mathrm{seq}}\approx0.8$ with $\kappa_{\mathrm{sym}}\approx0.2$.

@@ -1,0 +1,7 @@
+[deps]
+Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
+ClassicalDFT = "9d464fa6-e93d-4d45-9e5b-7c20149a9a88"
+IDPInterface = "8f5a3c1e-2b4d-4a6e-9c1f-7e2d5b8a4f10"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
