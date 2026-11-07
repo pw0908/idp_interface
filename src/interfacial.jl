@@ -1,72 +1,25 @@
 # Step 3: 1D interfacial profiles, interfacial tension, and electrostatic
 # potential profiles along a sequence's Step 1 binodal.
-
-"""
-    initialize_twophase_profile(sys::LSDFTSystem; width_frac=0.05)
-
-Builds a **periodic** double-interface ("slab") initial density profile
-between the two bulk phases stored in `sys.structure` (`ρbulk`/
-`topology.ρbulk2`), one identical copy per bead (every bead shares the same
-per-chain bulk density in the uniform limit -- see `LSDFTNeutral.jl`/
-`LSDFTIon.jl`). Phase 1 (`ρbulk`) occupies the middle half of the box,
-phase 2 (`ρbulk2`) the two outer quarters -- which are contiguous once the
-box wraps periodically, so the profile is continuous (and smooth) all the
-way around, with two symmetric interfaces.
-
-This periodicity is not optional: `ClassicalDFT`'s `evaluate_field!`/
-`propagate!` machinery is FFT-based and inherently periodic. An earlier
-version of this function used `ClassicalDFT.tanh_prof` for a single,
-one-sided transition (`ρbulk` at the left edge, `ρbulk2` at the right) --
-which is *discontinuous* once the box wraps from `ub` back to `lb`. That
-discontinuity gets smoothed away by the weighted-density convolutions within
-the first few iterations, and `converge!` reports a clean, fully-converged
-residual for a spurious uniform intermediate density instead of the
-intended two-phase profile -- a silent failure mode, not an error.
-
-Mirrors `ClassicalDFT.initialize_profiles`'s own `TwoPhaseSystem{:Cartesian}`
-method (`ClassicalDFT/src/structure/two_phase.jl`, which uses the
-inherently-periodic `cos_prof` for the same reason) rather than reusing it
-directly, because that method also calls `Clapeyron.crit_pure(pure_model)`
-with no custom initial guess, purely to pick a cosmetic steepness for the
-cosine shape. `Clapeyron`'s generic `crit_pure` guess assumes a van-der-
-Waals/SAFT-like critical packing fraction (~0.13-0.3) -- badly wrong for
-this EOS's actual ~0.01-0.02 (the same issue Step 1's `find_critical_point`
-was built to work around via bisection + a properly-scaled guess, see
-`phasediagram.jl`), and the trust-region solver can spin for a very long
-time rather than failing fast from a guess that far off. Since that call
-only shapes the *cosmetic* initial guess (not anything `converge!`'s
-correctness depends on), building an equally-reasonable periodic profile
-directly with two plain `tanh` steps -- `width_frac` controls each
-interface's width as a fraction of the box -- avoids it entirely without
-needing a parallel `crit_pure` fix.
-
-Because there are two interfaces, downstream `ClassicalDFT.surface_tension`
-values must be halved to get the physical (single-interface) tension --
-exactly the convention `ClassicalDFT.surface_tension(model,T,x)`'s own
-convenience method already uses.
-"""
-function initialize_twophase_profile(sys::LSDFTSystem; width_frac::Float64=0.05)
-    structure = sys.structure
-    ngrid = structure.ngrid
-    ρ1 = structure.ρbulk[1]         # phase 1 -- middle half of the box
-    ρ2 = structure.topology.ρbulk2[1] # phase 2 -- outer quarters
-    lb, ub = ClassicalDFT.bounds(structure, 1)
-    H = ub - lb
-    x = collect(ClassicalDFT.uniform_range(structure, 1))
-
-    # s ∈ [0,1): interface 1 (ρ2→ρ1) at s=0.25, interface 2 (ρ1→ρ2) at s=0.75.
-    s = @. (x - lb) / H
-    ρ_points = @. ρ2 + (ρ1 - ρ2) * 0.5 * (tanh((s - 0.25) / width_frac) - tanh((s - 0.75) / width_frac))
-
-    nbeads = sum(sys.species.nbeads)
-    FP = ClassicalDFT.fptype(sys.options)
-    device = sys.options.device
-    ρ = ClassicalDFT.allocate(device, FP, ngrid..., nbeads)
-    for j in 1:nbeads
-        ρ[:, j] = ClassicalDFT.adapt_to_device(device, FP, ρ_points)
-    end
-    return ρ
-end
+#
+# The naive, uncorrected periodic double-interface ("slab") tanh initial
+# guess this file used to build locally (`initialize_twophase_profile`) is
+# now `ClassicalDFT.initialize_profiles(sys)` itself: ClassicalDFT dispatches
+# on `model::ElectrolyteModel` (`ClassicalDFT/src/structure/two_phase.jl`)
+# to build exactly this per-component periodic tanh shape (fixed
+# `width_frac=0.05`, matching this project's own former default) instead of
+# its generic `Clapeyron.split_pure_model`+`crit_pure`-based `cos_prof`
+# method, which fails for LS's degenerate single-group ion components. The
+# domain-integrated electroneutrality Boltzmann rescale is applied
+# automatically by that same entry point for any system with an
+# `ElectrostaticPotentialModel` external field -- no separate correction
+# call needed here anymore. A genuinely net-charged system's bulk-to-bulk
+# Donnan potential jump (Ψ≠0) is likewise imposed automatically now, via
+# `ClassicalDFT.impose_donnan_structure!` (called internally by
+# `ClassicalDFT.initialize_profiles(sys)` for any `ElectrolyteModel` two-phase
+# system) -- reading Ψ directly off the bulk phases already stored on
+# `sys.structure` (`Clapeyron.donnan_psi_bulk`), with no caller involvement;
+# a no-op when the bulk phases are already Donnan-neutral (e.g. the
+# neutral-chain+symmetric-salt production systems, `Ψ≡0` by symmetry).
 
 """
     select_binodal_indices(pd; npoints=5, ratio_max=1e12)
@@ -127,11 +80,71 @@ function run_interfacial_point(model::LS, lB::Real, rho_dense_star::Real, rho_di
 
     structure = ClassicalDFT.TwoPhase1DCart((p_coex, T), rhobulk_dense, rhobulk_dilute,
                                              [-halfbox_L * L, halfbox_L * L], ngrid)
-    sys = LSDFTSystem(model, structure)
-    rho = initialize_twophase_profile(sys)
+    sys = ClassicalDFT.ElectrolyteDFTSystem(model, structure)
+    rho = ClassicalDFT.initialize_profiles(sys)
 
     if verbose
         println("  lB=$(round(lB, digits=4))  ratio=$(round(rho_dense_star / rho_dilute_star, sigdigits=3))...")
+        flush(stdout)
+    end
+    ClassicalDFT.converge!(sys, rho; verbose=false, maxit=maxit, tol=tol, anderson_m=anderson_m)
+    γ = ClassicalDFT.surface_tension(sys, rho) / 2  # halve: two interfaces in the periodic box
+
+    ef = sys.external_field[1]
+    nd = ClassicalDFT.dimension(sys)
+    CT = ClassicalDFT.transform_eltype(sys.structure, ClassicalDFT.fptype(sys.options))
+    Vext = similar(selectdim(rho, nd + 1, 1), CT)
+    P, iP = ClassicalDFT.build_transform(sys.structure, Vext, nd, sys.options.device)
+    dfdrho_dummy = similar(rho)
+    ClassicalDFT.evaluate_external_field!(sys.structure, ef, sys.model, rho, dfdrho_dummy, P, iP, Vext)
+    Vext_reduced = real.(Vext) ./ (Clapeyron.k_B * T)
+
+    x = collect(ClassicalDFT.uniform_range(structure, 1)) ./ L
+
+    if verbose
+        println("    γ=$(round(γ, sigdigits=4))")
+        flush(stdout)
+    end
+
+    return (gamma=γ, x=x, rho=Array(rho), Vext=Vext_reduced)
+end
+
+"""
+    run_interfacial_point_charged(model, T, x_dense, y, V_dense, V_dilute;
+                                   ngrid=(201,), halfbox_L=30.0, maxit=5000, tol=1e-6, anderson_m=5)
+
+Multi-component analogue of `run_interfacial_point`, for a genuine
+polyampholyte+counter-ion (or more generally N-component) `LS` model. Takes
+the converged output of
+`Clapeyron.bubble_pressure(model, T, x_dense, DonnanBubblePressure())`
+directly (`x_dense`/`y`/`V_dense`/`V_dilute`) as the two bulk phases'
+boundary condition, rather than re-deriving bulk densities from a single
+scalar star-density (ambiguous once there is more than one species) the way
+`run_interfacial_point` does for the single-component case.
+
+Returns the same `(gamma, x, rho, Vext)` shape as `run_interfacial_point`;
+`rho`'s last dimension spans every bead across every component (chain beads
+then ion bead(s), matching `model.charge`'s own ordering).
+"""
+function run_interfacial_point_charged(model::LS, T::Real, x_dense::AbstractVector, y::AbstractVector,
+                                        V_dense::Real, V_dilute::Real;
+                                        ngrid=(201,), halfbox_L::Float64=30.0,
+                                        maxit::Int=5000, tol::Float64=1e-6, anderson_m::Int=5,
+                                        verbose::Bool=true)
+    L = ClassicalDFT.length_scale(model)
+
+    rhobulk_dense = collect(x_dense) ./ V_dense
+    rhobulk_dilute = collect(y) ./ V_dilute
+    p_coex = Clapeyron.pressure(model, V_dense, T, x_dense)
+
+    structure = ClassicalDFT.TwoPhase1DCart((p_coex, T), rhobulk_dense, rhobulk_dilute,
+                                             [-halfbox_L * L, halfbox_L * L], ngrid)
+    sys = ClassicalDFT.ElectrolyteDFTSystem(model, structure)
+    rho = ClassicalDFT.initialize_profiles(sys)
+
+    if verbose
+        ratio = sum(rhobulk_dense) / sum(rhobulk_dilute)
+        println("  T=$(round(T, digits=4))  ratio=$(round(ratio, sigdigits=3))...")
         flush(stdout)
     end
     ClassicalDFT.converge!(sys, rho; verbose=false, maxit=maxit, tol=tol, anderson_m=anderson_m)
@@ -174,8 +187,8 @@ Returns a `NamedTuple` recording everything needed to reproduce any of the
 diagnostic plots built during Step 3 development, not just the scalar IFT:
 `charges`, `kappa_seq`, the `lB`/bulk densities actually used, per-point
 single-interface interfacial tension `gamma` (halved from
-`ClassicalDFT.surface_tension`'s raw two-interface value -- see this file's
-`initialize_twophase_profile` docstring), the shared grid `x` (units of
+`ClassicalDFT.surface_tension`'s raw two-interface value, since the periodic
+box has two interfaces), the shared grid `x` (units of
 `σ`), and the full bead-resolved density profiles `rho`
 (`npoints × ngrid × nbeads`) and electrostatic potential profiles `Vext`
 (`npoints × ngrid`, reduced `eψ/k_BT` units).
@@ -221,8 +234,8 @@ function run_interfacial_sequence(charges::AbstractVector{<:Integer}, pd;
 
         structure = ClassicalDFT.TwoPhase1DCart((p_coex, T), rhobulk_dense, rhobulk_dilute,
                                                  [-halfbox_L * L, halfbox_L * L], ngrid)
-        sys = LSDFTSystem(model, structure)
-        rho = initialize_twophase_profile(sys)
+        sys = ClassicalDFT.ElectrolyteDFTSystem(model, structure)
+        rho = ClassicalDFT.initialize_profiles(sys)
 
         if verbose
             println("  lB=$(round(lB, digits=4))  ratio=$(round(rho_dense_star / rho_dilute_star, sigdigits=3))...")

@@ -116,12 +116,72 @@ const TEST_SEQUENCES = [
         mymodel = IDPInterface.LS(charges)
         z = [1e-3]
         T = 298.15
-        V = Clapeyron.N_A * z[1] * mymodel.neutralmodel.params.N * IDPInterface.LS_SIGMA^3 / 0.2
+        V = Clapeyron.N_A * z[1] * mymodel.neutralmodel.params.N.values[1] * IDPInterface.LS_SIGMA^3 / 0.2
 
         a_neutral = Clapeyron.a_res(mymodel.neutralmodel, V, T, z)
         a_ion = Clapeyron.a_res(mymodel.ionmodel, V, T, z)
         a_total = Clapeyron.a_res(mymodel, V, T, z)
 
         @test a_neutral + a_ion ≈ a_total rtol=1e-12
+    end
+end
+
+@testset "LS with a genuine counter-ion component (2-component generalization)" begin
+    @testset "counter-ion coefficients vanish exactly ($name)" for (name, charges) in TEST_SEQUENCES
+        model = IDPInterface.LS(charges; ion_charge=-1)
+        @test length(model) == 2
+        @test model.neutralmodel.params.N.values == [length(charges), 1]
+        pN, pI = model.neutralmodel.params, model.ionmodel.params
+        # unbonded counter-ion component (N=1,Npm=0,Nnc=0): both chain-term
+        # coefficients must vanish identically, algebraically -- confirmed
+        # here directly, not merely observed in a_res's numerical output.
+        @test (1 - pN.N.values[2]) == 0
+        @test (1 + 2 * pI.Npm.values[2] + pI.Nnc.values[2] - pI.N.values[2]) == 0
+    end
+
+    @testset "hand-derived group-density cross-check ($name)" for (name, charges) in TEST_SEQUENCES
+        model = IDPInterface.LS(charges; ion_charge=-1)
+        z = [2e-3, 3e-3]
+        V = 0.05
+        ρ★ = IDPInterface.ls_group_densities(model.groups, V, z)
+        # Independent hand-sum over both components, bypassing
+        # ls_group_densities' own internal loop -- mirrors the
+        # count_bond_types/count_bond_types_from_groups cross-check pattern
+        # already used for the single-component case (test_sequences.jl).
+        ρ★_hand = zero(ρ★)
+        for c in eachindex(z)
+            ρ★_hand = ρ★_hand .+ Clapeyron.N_A .* z[c] .* model.groups.n_flattenedgroups[c] .* IDPInterface.LS_SIGMA^3 ./ V
+        end
+        @test ρ★ ≈ ρ★_hand rtol=1e-14
+        # No double counting *within the sum*: a global group slot CAN be
+        # shared across components now (the counter-ion's own "-" group and
+        # the chain's own "-" beads are literally the same charge-symbol
+        # group, sharing one global flattened-group index by design -- see
+        # LS.jl's "fixed name convention"), but each owning component's own
+        # n_flattenedgroups[c][k] entry still correctly reflects only ITS
+        # OWN multiplicity there, so the density sum above is exact
+        # regardless of how many components share a slot.
+        for k in eachindex(ρ★)
+            owners = count(c -> model.groups.n_flattenedgroups[c][k] != 0, eachindex(z))
+            @test owners >= 1
+        end
+    end
+
+    @testset "pressure/chemical potential evaluate cleanly at (V,T,z) ($name)" for (name, charges) in TEST_SEQUENCES
+        model = IDPInterface.LS(charges; ion_charge=-1)
+        z = [1e-3, 1e-3]
+        T = 300.0
+        V = 0.05
+        p = Clapeyron.pressure(model, V, T, z)
+        μ = Clapeyron.VT_chemical_potential(model, V, T, z)
+        @test isfinite(p)
+        @test length(μ) == 2
+        @test all(isfinite, μ)
+    end
+
+    @testset "backward compatibility: ion_charge=nothing unchanged (length 1)" for (name, charges) in TEST_SEQUENCES
+        model = IDPInterface.LS(charges)
+        @test length(model) == 1
+        @test model.neutralmodel.params.N.values == [length(charges)]
     end
 end

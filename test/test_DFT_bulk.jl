@@ -35,7 +35,7 @@ function dft_mu2(model::IDPInterface.LS, N; T=298.15, eta=0.2)
     rhobulk = z ./ V
     L = ClassicalDFT.length_scale(model)
     structure = ClassicalDFT.Uniform1DCart((1e5, T), rhobulk, [0.0, 3 * L], (3,))
-    sys = IDPInterface.LSDFTSystem(model, structure)
+    sys = ClassicalDFT.ElectrolyteDFTSystem(model, structure)
     rho = ClassicalDFT.initialize_profiles(sys)
     mu1 = Clapeyron.VT_chemical_potential_res(model, V, T, z) / T / Clapeyron.Rgas()
     mu2 = ClassicalDFT.δFδρ_res(sys, rho)
@@ -79,5 +79,35 @@ end
         mu2 = ClassicalDFT.δFδρ_res(sys, rho)
 
         @test all(x -> isapprox(x, mu1[1]; rtol=1e-8), mu2[1, :])
+    end
+
+    POLYAMPHOLYTE_DFT_TEST_SEQUENCES = [
+        ("Q=2", [1, -1, 1, -1, 1, 1, 1, -1]),  # 5 plus, 3 minus, sum=2
+        ("Q=4", [1, -1, 1, 1, 1, 1, 1, -1]),   # 6 plus, 2 minus, sum=4
+    ]
+    @testset "Genuine 2-component (chain + counter-ion) bulk limit ($name)" for (name, charges) in POLYAMPHOLYTE_DFT_TEST_SEQUENCES
+        Znet = sum(charges)
+        ion_charge = -1
+        xstar = ion_charge / (ion_charge - Znet)
+        x = [xstar, 1 - xstar]
+        N = length(charges)
+        model = IDPInterface.LS(charges; ion_charge=ion_charge, expand=true)
+        sigma = IDPInterface.LS_SIGMA
+        T = 298.15
+        for eta in (0.05, 0.2, 0.35)
+            rho_tot_star = eta * 6 / pi
+            z0 = 1e-3
+            z = x .* z0
+            V = Clapeyron.N_A * sigma^3 * (x[1] * N + x[2]) * z0 / rho_tot_star
+            rhobulk = z ./ V
+            L = ClassicalDFT.length_scale(model)
+            structure = ClassicalDFT.Uniform1DCart((1e5, T), rhobulk, [0.0, 3 * L], (3,))
+            sys = ClassicalDFT.ElectrolyteDFTSystem(model, structure)
+            rho = ClassicalDFT.initialize_profiles(sys)
+            mu1 = Clapeyron.VT_chemical_potential_res(model, V, T, z) / T / Clapeyron.Rgas()
+            mu2 = ClassicalDFT.δFδρ_res(sys, rho)
+            @test all(k -> isapprox(mu2[1, k], mu1[1]; rtol=1e-8), 1:N)  # every chain bead
+            @test isapprox(mu2[1, N+1], mu1[2]; rtol=1e-8)               # the counter-ion bead
+        end
     end
 end

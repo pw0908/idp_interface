@@ -54,6 +54,44 @@ function load_phase_diagram(path::AbstractString)
 end
 
 """
+    save_donnan_phase_diagram(path, result; charges=nothing)
+
+Save a `donnan_phase_diagram` result (a `NamedTuple` with `lB`,
+`rho_chain_dense`/`rho_chain_dilute`, `rho_ion_dense`/`rho_ion_dilute`,
+`Psi`, `kappa_seq`, `net_charge`, `Tc`, `lBc`) to a compressed JLD2 file.
+"""
+function save_donnan_phase_diagram(path::AbstractString, result; charges=nothing)
+    JLD2.jldopen(path, "w"; compress=true) do file
+        file["lB"] = result.lB
+        file["rho_chain_dense"] = result.rho_chain_dense
+        file["rho_chain_dilute"] = result.rho_chain_dilute
+        file["rho_ion_dense"] = result.rho_ion_dense
+        file["rho_ion_dilute"] = result.rho_ion_dilute
+        file["Psi"] = result.Psi
+        file["kappa_seq"] = result.kappa_seq
+        file["net_charge"] = result.net_charge
+        file["Tc"] = result.Tc
+        file["lBc"] = result.lBc
+        charges !== nothing && (file["charges"] = collect(charges))
+    end
+end
+
+"""
+    load_donnan_phase_diagram(path)
+
+Load a Donnan phase diagram previously saved with `save_donnan_phase_diagram`.
+"""
+function load_donnan_phase_diagram(path::AbstractString)
+    JLD2.jldopen(path, "r") do file
+        base = (lB=file["lB"], rho_chain_dense=file["rho_chain_dense"], rho_chain_dilute=file["rho_chain_dilute"],
+                rho_ion_dense=file["rho_ion_dense"], rho_ion_dilute=file["rho_ion_dilute"], Psi=file["Psi"],
+                kappa_seq=file["kappa_seq"], net_charge=file["net_charge"], Tc=file["Tc"], lBc=file["lBc"])
+        haskey(file, "charges") && return merge(base, (charges=file["charges"],))
+        return base
+    end
+end
+
+"""
     save_interfacial(path, result)
 
 Save a `run_interfacial_sequence` result to a compressed JLD2 file.

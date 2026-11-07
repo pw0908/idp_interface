@@ -168,30 +168,101 @@ function _kappa_sym_raw(charges::AbstractVector{<:Integer}, window::Int)
 end
 
 """
-    kappa_sym_max(N; window=6)
+    _palindrome_from_first_half(fh)
+
+Build the length-`2*length(fh)` palindrome (`charges[i]==charges[end+1-i]`)
+whose first half is `fh`.
+"""
+function _palindrome_from_first_half(fh::AbstractVector{<:Integer})
+    half = length(fh)
+    charges = Vector{Int}(undef, 2 * half)
+    charges[1:half] = fh
+    for i in 1:half
+        charges[2*half + 1 - i] = fh[i]
+    end
+    return charges
+end
+
+"""
+    _sequence_from_mirror_slots(leftvals, rightvals)
+
+Build the length-`2*length(leftvals)` sequence whose `j`-th mirror pair
+(`j`, `2half+1-j`) holds `(leftvals[j], rightvals[j])`. `leftvals==rightvals`
+recovers `_palindrome_from_first_half`; differing entries at slot `j` make
+that one mirror pair anti-paired instead of palindromic.
+"""
+function _sequence_from_mirror_slots(leftvals::AbstractVector{<:Integer}, rightvals::AbstractVector{<:Integer})
+    half = length(leftvals)
+    charges = Vector{Int}(undef, 2 * half)
+    charges[1:half] = leftvals
+    for j in 1:half
+        charges[2*half + 1 - j] = rightvals[j]
+    end
+    return charges
+end
+
+"""
+    kappa_sym_max(N; window=6, net_charge=0)
 
 The true achievable maximum of `kappa_sym`'s raw (unnormalized) sum for a
-net-neutral, equal-`+`/`-` sequence of length `N` -- i.e. the composition-
-conditioned normalizer `kappa_sym` actually divides by, in the same spirit
-as `kappa_seq`'s own worst-case-permutation normalization (rather than a
-simple analytical ceiling that a real composition can't reach; an earlier
-version of `kappa_sym` used exactly such a ceiling, `(2*window)^2*(N-window+1)`,
-which is why its values used to top out around `~0.48` instead of reaching
-`1`).
+length-`N` `+`/`-` sequence with the given `net_charge` (`net_charge=0` is
+the net-neutral, equal-`+`/`-` case this was originally derived for) -- i.e.
+the composition-conditioned normalizer `kappa_sym` actually divides by, in
+the same spirit as `kappa_seq`'s own worst-case-permutation normalization
+(rather than a simple analytical ceiling a real composition can't reach).
+`N` must be even and `N+net_charge` even (every mirror pair `(i,N+1-i)`
+contributes `Zᵢ+Z_{N+1-i} ∈ {-2,0,2}` to the total charge, so for even `N`
+the net charge is always even).
 
-The maximizing sequence is the single-transition palindrome
-`[+1×(N/4), -1×(N/2), +1×(N/4)]` (requires `N` divisible by `4`) --
+**Net-neutral case (`net_charge=0`, originally derived)**: the maximizer is
+the single-transition palindrome `[+1×(N/4), -1×(N/2), +1×(N/4)]` --
 justified two ways: (1) analytically, for any exact palindrome
 `Zᵢ+Z_{N+1-i}=2Zᵢ` identically, so `kappa_sym`'s raw sum reduces to `4×`
 the sum of squared plain windowed charge sums, maximized by the most-blocky
 (single-transition) balanced arrangement; (2) confirmed directly by brute
 force (200,000 random shuffles of ten `+1`/ten `-1` beads for `N=20`: none
 exceeded this reference's raw value of `1040`).
+
+**Net-charged generalization**: with `n_plus=(N+net_charge)÷2`,
+`n_minus=N-n_plus` beads of each sign, split the `N/2` mirror-pair slots into
+`n_plus÷2` "+1"-matched pairs and `n_minus÷2` "-1"-matched pairs (a strict
+palindrome, exactly as above) whenever `n_plus` is even. When `n_plus` (and
+hence `n_minus`, since their sum `N` is even) is *odd*, a strict palindrome
+can't realize this composition -- pairing up `⌊n_plus/2⌋`/`⌊n_minus/2⌋`
+matched slots leaves one leftover `+1` and one leftover `-1` bead, forced
+into a single **anti**-paired mirror slot. Which of the few resulting
+block-order/anti-slot-position/anti-slot-sign combinations is best isn't
+obvious analytically, so all of them are tried and the maximum taken --
+confirmed to reproduce the true exhaustive-search maximum exactly for every
+composition tested at `N∈{8,12}` (all `window`/`net_charge` combinations),
+and to match or beat 300,000-shuffle random search at `N=20,window=6` for
+every even `net_charge∈[-20,20]` (including exact agreement with the
+original `net_charge=0` value, `1040`).
 """
-function kappa_sym_max(N::Int; window::Int=6)
-    N % 4 == 0 || throw(ArgumentError("kappa_sym_max's reference construction needs N divisible by 4"))
-    ref = vcat(fill(1, N ÷ 4), fill(-1, N ÷ 2), fill(1, N ÷ 4))
-    return _kappa_sym_raw(ref, window)
+function kappa_sym_max(N::Int; window::Int=6, net_charge::Int=0)
+    iseven(N) || throw(ArgumentError("kappa_sym_max needs N even (mirror pairs require no unpaired middle bead)"))
+    iseven(N + net_charge) || throw(ArgumentError("net_charge=$net_charge incompatible with N=$N (N+net_charge must be even)"))
+    n_plus = (N + net_charge) ÷ 2
+    n_minus = N - n_plus
+    (0 <= n_plus <= N) || throw(ArgumentError("net_charge=$net_charge infeasible for N=$N beads of unit charge"))
+
+    best = -1
+    if iseven(n_plus)
+        pp, mp = n_plus ÷ 2, n_minus ÷ 2
+        for fh in (vcat(fill(1, pp), fill(-1, mp)), vcat(fill(-1, mp), fill(1, pp)))
+            best = max(best, _kappa_sym_raw(_palindrome_from_first_half(fh), window))
+        end
+    else
+        pp, mp = n_plus ÷ 2, n_minus ÷ 2  # floor; one +1 and one -1 bead left over
+        for base in (vcat(fill(1, pp), fill(-1, mp)), vcat(fill(-1, mp), fill(1, pp)))
+            for pos in 1:(length(base) + 1), (lval, rval) in ((1, -1), (-1, 1))
+                left = copy(base); insert!(left, pos, lval)
+                right = copy(base); insert!(right, pos, rval)
+                best = max(best, _kappa_sym_raw(_sequence_from_mirror_slots(left, right), window))
+            end
+        end
+    end
+    return best
 end
 
 """
@@ -201,16 +272,18 @@ A *windowed* mirror-asymmetry statistic, complementary to `mirror_symmetry`'s
 single whole-sequence correlation the same way `kappa_seq`'s local blob
 averaging complements a single global composition statistic:
 ```
-kappa_sym = (1/kappa_sym_max(N)) * Σ_{j=1}^{N-window+1} ( Σ_{i=j}^{j+window-1} (Zᵢ + Z_{N+1-i}) )²
+kappa_sym = (1/kappa_sym_max(N; net_charge=sum(charges))) * Σ_{j=1}^{N-window+1} ( Σ_{i=j}^{j+window-1} (Zᵢ + Z_{N+1-i}) )²
 ```
 Each inner term `Zᵢ + Z_{N+1-i}` is exactly `0` whenever position `i` and its
 mirror partner are anti-symmetric (`Zᵢ==-Z_{N+1-i}`) -- the specific,
 rigorously-protected condition that forces zero interfacial electrostatic
-potential (see `mirror_symmetry`'s docstring) -- and nonzero (`±2`) whenever
-they are not (whether because they're palindromic, `Zᵢ==Z_{N+1-i}`, or just
-uncorrelated). Squaring and summing over a sliding window therefore measures
-*local deviation from the anti-palindrome condition specifically*, rather
-than `mirror_symmetry`'s signed correlation, which spends a sign
+potential for a *net-neutral* chain (see `mirror_symmetry`'s docstring; for
+a genuinely net-charged chain a perfect anti-palindrome is impossible, since
+it would force `net_charge=0` by construction) -- and nonzero (`±2`)
+whenever they are not (whether because they're palindromic, `Zᵢ==Z_{N+1-i}`,
+or just uncorrelated). Squaring and summing over a sliding window therefore
+measures *local deviation from the anti-palindrome condition specifically*,
+rather than `mirror_symmetry`'s signed correlation, which spends a sign
 distinguishing palindrome from anti-palindrome but can't (by construction,
 being a single whole-sequence average) say anything about *where* along the
 chain the reflective structure lives. `kappa_sym=0` exactly for `block1`
@@ -220,16 +293,15 @@ electrostatic potential) -- and, unlike `mirror_symmetry`, would also read
 others, distinguishing that case from a globally-uncorrelated one that
 `mirror_symmetry` alone cannot.
 
-Normalized by `kappa_sym_max(N; window)`, the *true* achievable maximum for
-a net-neutral sequence of this length (not a simple analytical ceiling --
-see `kappa_sym_max`'s docstring), so `kappa_sym∈[0,1]` with `1` genuinely
-reachable (by the single-transition palindrome `kappa_sym_max` itself is
-built from).
+Normalized by `kappa_sym_max(N; window, net_charge=sum(charges))`, the
+*true* achievable maximum for a sequence of this length and net charge (not
+a simple analytical ceiling -- see `kappa_sym_max`'s docstring), so
+`kappa_sym∈[0,1]` with `1` genuinely reachable.
 """
 function kappa_sym(charges::AbstractVector{<:Integer}; window::Int=6)
     N = length(charges)
     raw = _kappa_sym_raw(charges, window)
-    return raw / kappa_sym_max(N; window=window)
+    return raw / kappa_sym_max(N; window=window, net_charge=sum(charges))
 end
 
 """
@@ -249,6 +321,41 @@ function random_blocky_sequence(N::Int, rng::Random.AbstractRNG; max_block::Int=
     half = N ÷ 2
     charges = Int[]
     remaining = [half, half]  # [remaining +, remaining -]
+    sign = rand(rng, (1, -1))
+    while length(charges) < N
+        idx = sign > 0 ? 1 : 2
+        run = min(rand(rng, 1:max_block), remaining[idx])
+        if run == 0
+            sign = -sign
+            continue
+        end
+        append!(charges, fill(sign, run))
+        remaining[idx] -= run
+        sign = -sign
+    end
+    return charges
+end
+
+"""
+    random_polyampholyte_sequence(N, net_charge, rng; max_block=4)
+
+A charge-**asymmetric** (`net_charge != 0` allowed) analogue of
+`random_blocky_sequence`: a `+`/`-` sequence of length `N` (`N` even,
+`N+net_charge` even -- see `kappa_sym_max`'s docstring for why) with no
+imposed symmetry, built the same way (concatenating random runs of length
+`1:max_block`, alternating sign, run lengths clipped so neither sign's count
+overshoots its target), except the two signs' target counts are
+`n_plus=(N+net_charge)÷2`/`n_minus=N-n_plus` instead of both fixed at `N÷2`.
+`net_charge=0` reproduces `random_blocky_sequence`'s exact distribution.
+"""
+function random_polyampholyte_sequence(N::Int, net_charge::Int, rng::Random.AbstractRNG; max_block::Int=4)
+    iseven(N) || throw(ArgumentError("N must be even (mirror-pair/parity conventions used throughout this module require it)"))
+    iseven(N + net_charge) || throw(ArgumentError("net_charge=$net_charge incompatible with N=$N (N+net_charge must be even)"))
+    n_plus = (N + net_charge) ÷ 2
+    n_minus = N - n_plus
+    (0 <= n_plus <= N) || throw(ArgumentError("net_charge=$net_charge infeasible for N=$N beads of unit charge"))
+    charges = Int[]
+    remaining = [n_plus, n_minus]
     sign = rand(rng, (1, -1))
     while length(charges) < N
         idx = sign > 0 ? 1 : 2
@@ -325,7 +432,17 @@ function high_kappa_asymmetric_sequence(N::Int, rng::Random.AbstractRNG; n_anti:
                                          nswaps::Int=0, p_fh::Union{Int,Nothing}=nothing)
     iseven(N) || throw(ArgumentError("N must be even for an equal +/- sequence"))
     half = N ÷ 2
-    iseven(n_anti) || throw(ArgumentError("n_anti must be even to keep the sequence net-neutral"))
+    # Net-neutrality requires n_anti and half to have the SAME parity, not
+    # "n_anti always even": each anti pair contributes exactly one +1 bead,
+    # each same pair contributes 0 or 2, so n_anti + 2*n_same_plus = half
+    # needs (half - n_anti) even. For N=20 (half=10, even) that reduces to
+    # "n_anti even", which is what this check used to say unconditionally --
+    # true by coincidence for N=20, but WRONG for N=50 (half=25, odd, where
+    # n_anti must be ODD). The old unconditional `iseven(n_anti)` check
+    # silently produced non-net-neutral sequences (net_charge=-2, every
+    # time) for every N=50 call in the 50mer sampling campaign -- caught by
+    # directly inspecting `sum(charges)` on a generated sequence.
+    n_anti % 2 == half % 2 || throw(ArgumentError("n_anti must have the same parity as N÷2=$half to keep the sequence net-neutral (got n_anti=$n_anti)"))
     0 <= n_anti <= half || throw(ArgumentError("n_anti must be in [0, $half]"))
 
     n_same = half - n_anti
@@ -389,4 +506,38 @@ function perturbed_diblock_sequence(N::Int, rng::Random.AbstractRNG; nswaps::Int
         seq[i], seq[j] = seq[j], seq[i]
     end
     return seq
+end
+
+"""
+    das_pappu_sequences()
+
+The 30 canonical `sv1`-`sv30` sequences from Das & Pappu (PNAS 2013) --
+50-mers, all the same composition (25 `+`, 25 `-`, net-neutral), spanning
+charge patterning from near-perfect alternation (`sv1`, lowest `κ`) to a
+perfect diblock (`sv30`, `κ=1`). Parsed directly from
+`resources/das_pappu_seq.txt` (one `+`/`-` string per line, in `sv1..sv30`
+order) -- a plain-text source Pierre supplied directly, deliberately NOT
+reconstructed from an image or from memory of the paper (an earlier
+attempt at reading the sequences from a screenshot of the paper's figure
+produced sequences that were all systematically 48, not 50, characters
+long -- a real, caught transcription failure, not a hypothetical risk).
+
+Returns a `Vector{Tuple{String,Vector{Int}}}` of `(name, charges)` pairs,
+`name` = `"sv1"`, `"sv2"`, ..., in file order. Every sequence is verified
+(`@assert`, not just documented) to be length 50 and exactly net-neutral
+(25 `+`, 25 `-`) every time this is called, so a corrupted or truncated
+copy of the data file fails loudly rather than silently feeding a bad
+sequence into a batch run.
+"""
+function das_pappu_sequences()
+    path = joinpath(@__DIR__, "..", "resources", "das_pappu_seq.txt")
+    lines = readlines(path)
+    seqs = Vector{Tuple{String,Vector{Int}}}(undef, length(lines))
+    for (i, line) in enumerate(lines)
+        charges = [c == '+' ? 1 : -1 for c in line if c in ('+', '-')]
+        length(charges) == 50 || throw(ErrorException("das_pappu_sequences: sv$i has length $(length(charges)), expected 50 -- check resources/das_pappu_seq.txt"))
+        sum(charges) == 0 || throw(ErrorException("das_pappu_sequences: sv$i is not net-neutral (sum=$(sum(charges))) -- check resources/das_pappu_seq.txt"))
+        seqs[i] = ("sv$i", charges)
+    end
+    return seqs
 end

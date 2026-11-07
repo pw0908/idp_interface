@@ -1,0 +1,167 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Supporting Information for "Sequence Asymmetry Produces Interfacial
+%% Electrostatic Potentials in Biomolecular Condensates"
+%% Explicit LS-theory bulk EOS and classical DFT equations, numerical
+%% solution method, and the exact kappa_sym/kappa_sym_max definitions,
+%% all extracted directly from the implementation (Clapeyron.jl's LS.jl,
+%% cDFT.jl-ls-integration's FMT/TangentHSPropagator/Electrolyte-LS
+%% modules, and this project's own sequences.jl) rather than restated
+%% from memory, so every equation below matches the code that actually
+%% produced the main text's results.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[journal=macl,manuscript=suppinfo,layout=onecolumn]{achemso}
+\usepackage[version=3]{mhchem}
+\usepackage{bm}
+
+\author{Pierre J. Walker}
+\email{pjwalker@caltech.edu}
+\affiliation{Division of Chemistry and Chemical Engineering, California Institute of Technology, Pasadena, California, USA}
+
+\title{Sequence Asymmetry Produces Interfacial Electrostatic Potentials in Biomolecular Condensates}
+
+\begin{document}
+\maketitle
+
+\section{Reduced units and bead model}
+\label{si:units}
+
+Every bead -- chain or small-ion, charged or neutral -- is a hard sphere of the same diameter $\sigma = 3\times10^{-10}\,\mathrm{m}$ (\texttt{LS\_SIGMA}). Number densities are reduced as $\rho^\star_k \equiv N_\mathrm{A}\sigma^3\sum_c z_c\, n_{k,c}/V$, where $n_{k,c}$ is the count of group/bead $k$ in component $c$ and $z_c$ its mole number; $\eta\equiv(\pi/6)\sum_k\rho^\star_k$ is the total packing fraction. Electrostatics enter only through the (reduced) Bjerrum length
+\begin{equation}
+    \ell_\mathrm{B} = \frac{e^2}{4\pi\epsilon_0\epsilon_r\sigma k_\mathrm{B}T}\,,
+    \label{eq:si-lB}
+\end{equation}
+with $\epsilon_r$ a constant (restricted-primitive-model, i.e.\ implicit-solvent) relative permittivity; a target $\ell_\mathrm{B}$ is converted to a temperature by inverting Eq.~\ref{eq:si-lB} at fixed $\epsilon_r$. A bare, isolated ion contributes $N=1$, $N_\mathrm{pm}=N_\mathrm{nc}=0$ to every component-level sum below, so it is handled by exactly the same expressions as a chain bead, with no special-casing.
+
+\section{Bulk LS-theory equation of state}
+\label{si:bulk}
+
+The bulk residual reduced Helmholtz energy per mole of chain/ion, $a_\mathrm{res}=\beta A_\mathrm{res}/\sum_c z_c$, follows Zhang \textit{et al.}\cite{zhangSaltingOutSaltingInPolyelectrolyte2016} and splits exactly as $a_\mathrm{res}=a_\mathrm{res}^\mathrm{neutral}+a_\mathrm{res}^\mathrm{ion}$, each evaluated at the same set of reduced group densities $\rho^\star_k$.
+
+\paragraph{Neutral half (hard-sphere + $\Gamma_\mathrm{MSA}{=}0$ chain).}
+\begin{align}
+    f_\mathrm{hs} &= \frac{6\eta^2(4-3\eta)}{\pi(1-\eta)^2}\,, \label{eq:si-fhs}\\
+    g_\mathrm{hs} &= \frac{1}{1-\eta} + \frac{1}{2}\frac{3\eta}{(1-\eta)^2} + \frac{1}{4}\frac{2\eta^2}{(1-\eta)^3}\,, \label{eq:si-ghs}\\
+    a_\mathrm{res}^\mathrm{neutral} &= \frac{f_\mathrm{hs} + \sum_c \rho^\star_\mathrm{chain,c}\,(1-N_c)\ln g_\mathrm{hs}}{\sum_c \rho^\star_\mathrm{chain,c}}\,, \label{eq:si-aneutral}
+\end{align}
+where $\rho^\star_{\mathrm{chain},c}=N_\mathrm{A}\sigma^3 z_c/V$ is component $c$'s own (whole-chain) reduced density, $N_c$ its bead count, and $g_\mathrm{hs}$ the equal-diameter hard-sphere contact value (the same BMCSL-type correlation\cite{boublikHardSphereEquationState1970,mansooriEquilibriumThermodynamicProperties1971} used by the spatial DFT's chain term below, so the bulk model and the DFT it feeds stay mutually consistent). Eq.~\ref{eq:si-fhs}-\ref{eq:si-ghs} are the $\Gamma_\mathrm{MSA}\to0$ (uncharged) limit of the full TPT1 bonding free energy; $(1-N_c)\ln g_\mathrm{hs}$ per chain is the standard Wertheim first-order perturbation result\cite{wertheimFluidsHighlyDirectional1984,wertheimFluidsHighlyDirectional1984a,wertheimFluidsHighlyDirectional1986,wertheimFluidsHighlyDirectional1986a} for $N_c-1$ tangent bonds.
+
+\paragraph{Ion half (restricted-primitive-model Blum-MSA + charge-induced chain correction).}
+For equal-sized beads the Blum-MSA screening parameter\cite{blumMeanSphericalModel1975} has the closed form
+\begin{equation}
+    \kappa_\mathrm{MSA} = \sqrt{4\pi\ell_\mathrm{B}\sum_k \rho^\star_k\,|Z_k|\,Z_k^2}\,,\qquad
+    \Gamma_\mathrm{MSA} = \frac{-1+\sqrt{1+2\kappa_\mathrm{MSA}}}{2}\,,
+    \label{eq:si-GammaMSA}
+\end{equation}
+with $Z_k$ the integer valence of group $k$ (the $|Z_k|Z_k^2=|Z_k|^3$ combination is just $Z_k^2$ for a single-charge species but keeps the correct sign/magnitude convention for general integer charge). The MSA electrostatic free energy and the resulting shift in the chain term's bonded contact value (every bonded $\ln y_\mathrm{hs}$ pair picks up a $\Gamma_\mathrm{MSA}$-dependent correction whose $g_\mathrm{hs}$-independent part survives after subtracting the $\Gamma_\mathrm{MSA}=0$ reference) are
+\begin{align}
+    f_\mathrm{el} &= -\frac{\Gamma_\mathrm{MSA}^3}{\pi}\left(\frac{2}{3}+\Gamma_\mathrm{MSA}\right)\,, \label{eq:si-fel}\\
+    \Delta &= \ell_\mathrm{B}\left(1 - \frac{1}{(1+\Gamma_\mathrm{MSA})^2}\right)\,, \label{eq:si-Delta}\\
+    a_\mathrm{res}^\mathrm{ion} &= \frac{f_\mathrm{el} + \sum_c \rho^\star_{\mathrm{chain},c}\,(1+2N_{\mathrm{pm},c}+N_{\mathrm{nc},c}-N_c)\,\Delta}{\sum_c \rho^\star_{\mathrm{chain},c}}\,, \label{eq:si-aion}
+\end{align}
+where $N_{\mathrm{pm},c}$ counts component $c$'s own bonds between unlike-charge beads and $N_{\mathrm{nc},c}$ its bonds involving a neutral bead (a same-charge bond contributes to neither). The composite model's residual free energy is $a_\mathrm{res}=a_\mathrm{res}^\mathrm{neutral}+a_\mathrm{res}^\mathrm{ion}$, which together with the standard ideal/translational term $\beta f_\mathrm{id}(\rho)=\sum_k\rho_k[\ln(\rho_k\Lambda_k^3)-1]$ gives the main text's four-term decomposition, Eq.~1.
+
+\section{Classical density functional theory}
+\label{si:dft}
+
+The spatial profiles $\rho_k(\mathbf{r})$ solve the Euler-Lagrange fixed-point equation already given in the main text (Eq.~2), reproduced here for completeness:
+\begin{equation}
+    \rho_k(\mathbf{r}) = \rho_k^\mathrm{b}\exp\!\left[-\beta\left(\frac{\delta F_\mathrm{res}[\rho]}{\delta\rho_k(\mathbf{r})} - \frac{\delta F_\mathrm{res}[\rho]}{\delta\rho_k(\mathbf{r})}\bigg\vert_{\rho^\mathrm{b}} - Z_k e\,\psi(\mathbf{r})\right)\right]\,.
+    \label{eq:si-fixedpoint}
+\end{equation}
+$F_\mathrm{res}[\rho]$ is the local functional whose three pieces are detailed below (hard-sphere, chain, and a local-density electrostatic correlation correction); the mean-field Coulomb term $-Z_ke\psi(\mathbf{r})$ is kept separate and computed by an explicit Poisson solve (described below), exactly mirroring the bulk model's own split between the MSA correlation free energy (Eq.~\ref{eq:si-fel}) and the (implicit, bulk-exactly-zero) mean electric field.
+
+\subsection{Hard-sphere term: fundamental measure theory}
+\label{si:fmt}
+
+$F_\mathrm{hs}[\rho]=k_\mathrm{B}T\int\!\mathrm{d}\mathbf{r}\,\Phi_\mathrm{hs}(\{n_\alpha(\mathbf{r})\})$ uses Rosenfeld's fundamental measure theory\cite{rosenfeldFreeenergyModelInhomogeneous1989} in the White-Bear-type form of Yu and Wu\cite{yuStructuresHardsphereFluids2002} (see also the review by Roth\cite{rothFundamentalMeasureTheory2002}), built from the weighted densities
+\begin{equation}
+    n_\alpha(\mathbf{r}) = \sum_k \int\!\mathrm{d}\mathbf{r}'\,\rho_k(\mathbf{r}')\,\omega_k^{(\alpha)}(\mathbf{r}-\mathbf{r}')\,,\qquad \alpha\in\{0,1,2,3,v1,v2\}\,,
+    \label{eq:si-weighted}
+\end{equation}
+where $\omega_k^{(2)}(\mathbf{r})=\delta(d_k/2-|\mathbf{r}|)$, $\omega_k^{(3)}(\mathbf{r})=\Theta(d_k/2-|\mathbf{r}|)$, $\omega_k^{(0)}=\omega_k^{(2)}/(\pi d_k^2)$, $\omega_k^{(1)}=\omega_k^{(2)}/(2\pi d_k)$, $\omega_k^{(v2)}=(\mathbf{r}/|\mathbf{r}|)\,\omega_k^{(2)}(\mathbf{r})$, $\omega_k^{(v1)}=\omega_k^{(v2)}/(2\pi d_k)$, and $d_k=\sigma$ for every bead here. These convolutions are evaluated as products in Fourier space (closed-form transforms of the spherical-shell/ball weights). The free-energy density is
+\begin{equation}
+    \Phi_\mathrm{hs} = -n_0\ln(1-n_3) + \frac{n_1n_2-\mathbf{n}_{v1}\!\cdot\!\mathbf{n}_{v2}}{1-n_3} + \left(\frac{n_2^3}{3}-n_2\,\mathbf{n}_{v2}\!\cdot\!\mathbf{n}_{v2}\right)\left[\frac{\ln(1-n_3)}{12\pi n_3^2}+\frac{1}{12\pi n_3(1-n_3)^2}\right]\,.
+    \label{eq:si-Phihs}
+\end{equation}
+
+\subsection{Chain term: TPT1 density functional via a recursive propagator}
+\label{si:chain}
+
+The exact sequence of tangent bonds in each chain is resolved by the Yu-Wu TPT1 density functional\cite{yuDensityFunctionalTheory2002} for branched/linear bonded hard-sphere chains, specialized here to a linear sequence (every chain bead has at most two bonded neighbors). Writing the chain's own bond graph as a rooted tree, define the per-bond convolution kernel
+\begin{equation}
+    \omega_{jk}(\mathbf{r}) = \frac{\delta(|\mathbf{r}|-\sigma_{jk})}{4\pi\sigma_{jk}^2}\,,\qquad \sigma_{jk}=\tfrac{1}{2}(d_j+d_k)=\sigma\,,
+    \label{eq:si-bondkernel}
+\end{equation}
+the normalized spherical-shell delta function at the bond length. Two recursive propagators are built over the tree: a bottom-up cavity-correlation function $G_{k\to\alpha}^\mathrm{c}(\mathbf{r})$, for every bead $\alpha$ one bond further from the root than its parent $k$,
+\begin{equation}
+    G_{k\to\alpha}^\mathrm{c}(\mathbf{r}) = \int\!\mathrm{d}\mathbf{r}'\,\omega_{k\alpha}(\mathbf{r}-\mathbf{r}')\,\exp\!\left[-\beta\frac{\delta F_\mathrm{res}^\mathrm{local}}{\delta\rho_\alpha(\mathbf{r}')}\right]\prod_{\beta\in\mathrm{children}(\alpha)} G_{\alpha\to\beta}^\mathrm{c}(\mathbf{r}')\,,
+    \label{eq:si-Gc}
+\end{equation}
+evaluated from the leaves inward, and a top-down propagator $G_k^\mathrm{p}(\mathbf{r})$ (root: $G^\mathrm{p}\equiv1$),
+\begin{equation}
+    G_k^\mathrm{p}(\mathbf{r}) = \int\!\mathrm{d}\mathbf{r}'\,\omega_{lk}(\mathbf{r}-\mathbf{r}')\,\exp\!\left[-\beta\frac{\delta F_\mathrm{res}^\mathrm{local}}{\delta\rho_l(\mathbf{r}')}\right]G_l^\mathrm{p}(\mathbf{r}')\prod_{\substack{\alpha\in\mathrm{children}(l)\\\alpha\neq k}} G_{l\to\alpha}^\mathrm{c}(\mathbf{r}')\,,
+    \label{eq:si-Gp}
+\end{equation}
+evaluated from the root outward ($l$: bead $k$'s own parent). Here $\delta F_\mathrm{res}^\mathrm{local}/\delta\rho_\alpha$ is the non-chain (hard-sphere $+$ electrostatic, see below) part of the functional derivative. The chain term's own contribution to the total functional derivative appearing in Eq.~\ref{eq:si-fixedpoint} is then, for each bead $j$ bonded to parent-side neighbor set as above,
+\begin{equation}
+    \beta\frac{\delta F_\mathrm{chain}}{\delta\rho_j(\mathbf{r})} = -\ln G_j^\mathrm{p}(\mathbf{r}) - \sum_{\alpha\,:\,j\to\alpha} \ln G_{j\to\alpha}^\mathrm{c}(\mathbf{r})\,,
+    \label{eq:si-chainderiv}
+\end{equation}
+summed over every bead $\alpha$ one bond farther from the root than $j$. For a free (unbonded) ion this sum is empty and $G^\mathrm{p}\equiv1$, so Eq.~\ref{eq:si-chainderiv} vanishes identically, consistent with the bulk limit. Each convolution in Eqs.~\ref{eq:si-Gc}-\ref{eq:si-Gp} is again evaluated in Fourier space using the closed-form transform of Eq.~\ref{eq:si-bondkernel}, $\hat\omega_{jk}(\mathbf{k})=\mathrm{sinc}(|\mathbf{k}|\sigma_{jk})$, with an isotropic Lanczos $\sigma$-factor ($\mathrm{sinc}(|\mathbf{k}|/k_\mathrm{Nyq})$) applied to suppress Gibbs-phenomenon ringing from this genuinely discontinuous real-space kernel at the grid's own resolution limit.
+
+\subsection{Electrostatic term: local MSA correlation correction and the mean-field potential}
+\label{si:elDFT}
+
+The charged part of $F_\mathrm{res}$ is a local-density approximation: at each point, the bulk closed forms of Eq.~\ref{eq:si-GammaMSA}-\ref{eq:si-Delta} are evaluated using a \emph{smoothed} local ion density,
+\begin{equation}
+    \tilde\rho^\star_k(\mathbf{r}) = \int\!\mathrm{d}\mathbf{r}'\,\rho_k(\mathbf{r}')\,\omega^{(0)}_{k,w}(\mathbf{r}-\mathbf{r}')\,,\qquad w_k = \frac{\sigma}{2}+\frac{1}{\kappa_\mathrm{MSA}^\mathrm{bulk}}\,,
+    \label{eq:si-smoothed}
+\end{equation}
+i.e.\ the same $n_0$-type weight as Eq.~\ref{eq:si-weighted} but with a width equal to the ion radius plus the bulk Debye-MSA screening length, $\kappa_\mathrm{MSA}^\mathrm{bulk}$ evaluated once from the reference (dense-phase) bulk densities. This gives $\Gamma_\mathrm{MSA}(\mathbf{r})$, $f_\mathrm{el}(\mathbf{r})$ (Eq.~\ref{eq:si-fel}) and $\Delta(\mathbf{r})$ (Eq.~\ref{eq:si-Delta}) as local fields; the per-bond chain correction becomes $-\tfrac{1}{2}\rho_k(\mathbf{r})\,s_{kl}\,\Delta(\mathbf{r})$ summed over each bonded pair $(k,l)$, with $s_{kl}=+1$ for a same-charge bond, $-1$ for an unlike-charge bond, and $0$ if either bead is neutral (reducing to the bulk's $(1+2N_\mathrm{pm}+N_\mathrm{nc}-N)\Delta$ per chain in the uniform limit).
+
+\subsection{Mean-field electrostatic potential}
+\label{si:poisson}
+
+$\psi(\mathbf{r})$ solves the ordinary Poisson equation for the local charge density $\rho_q(\mathbf{r})=\sum_kZ_ke\,\rho_k(\mathbf{r})$ in the constant-$\epsilon_r$ medium,
+\begin{equation}
+    \nabla^2\psi(\mathbf{r}) = -\frac{\rho_q(\mathbf{r})}{\epsilon_0\epsilon_r}\,,
+    \label{eq:si-poisson}
+\end{equation}
+solved directly by Fourier convolution with the bare Coulomb Green's function, $\hat\psi(\mathbf{k})=\hat\rho_q(\mathbf{k})/(\epsilon_0\epsilon_r k^2)$ ($k=0$ set to $0$, the standard periodic-Ewald device). The resulting $\psi$ is then re-referenced to zero at the simulation box's structural center (the dense-phase side of the two-phase slab -- see \textit{Numerical solution}, below) before entering Eq.~\ref{eq:si-fixedpoint} -- the raw $k=0$-excluded convolution instead leaves $\psi$ in a zero-\emph{domain-average} gauge, which for a genuinely two-phase (unequal-bulk) profile would split the true bulk-to-bulk potential jump asymmetrically around the reference state the chemical potentials are defined at.
+
+\section{Numerical solution}
+\label{si:numerics}
+
+\paragraph{Simulation cell.} Every profile is a 1D Cartesian, periodic, two-bulk-phase slab: a tanh-shaped initial guess per component connects the dense-phase density (placed at the domain's structural center) to the dilute-phase density (at both edges, the box's second interface), avoiding the spurious intermediate-density collapse a sharp step profile produces within the first few iterations. Salt-free profiles use a half-box width of $30\sigma$; profiles with added salt use $100\sigma$ (the much longer electrostatic screening length in the dilute phase requires the wider box). The grid spacing is fixed at $\Delta x = 30\sigma/400 = 0.075\sigma$ regardless of box width (so the salted $100\sigma$ box uses $\mathrm{NGRID}=\mathrm{round}(400\times100/30)+1=1334$ points).
+
+\paragraph{Self-consistent iteration.} Eq.~\ref{eq:si-fixedpoint} is solved by direct (Picard) substitution with damping $\beta_\mathrm{mix}=10^{-2}$ until the fixed-point residual drops below $10^{-1}$, then accelerated by Anderson mixing (5 retained iterates) down to a final tolerance of $10^{-4}$ on the same residual, capped at $15{,}000$ total iterations. For a genuinely charged system, electroneutrality (zero net charge integrated over the whole periodic cell) is re-imposed on the incoming trial profile at every iteration by a Newton solve for a single constant potential shift $\psi_0$ satisfying $\sum_kZ_k\int\rho_k(\mathbf{r})\,e^{-Z_k\psi_0}\,\mathrm{d}\mathbf{r}=0$, applied as a uniform Boltzmann reweighting $\rho_k\to\rho_k\,e^{-Z_k\psi_0}$ before the next field evaluation.
+
+\paragraph{Bulk boundary conditions.} The two bulk densities feeding the initial profile and Eq.~\ref{eq:si-fixedpoint}'s reference state are obtained independently from the spatial DFT, from Clapeyron's own bulk phase-equilibrium solver for the LS equation of state (\textit{Bulk LS-theory equation of state}, above): a standard isothermal bubble-point solve for the salt-free sequences, and a Donnan-equilibrium bubble-point solve (equal electrochemical potential for every mobile-ion species, zero electrostatic potential difference between the bulk phases) once a symmetric 1:1 salt is added.
+
+\paragraph{Interfacial tension.} Reported via the standard grand-potential route,
+\begin{equation}
+    \gamma = \frac{1}{2}\left[F k_\mathrm{B}T - \sum_i\mu_i\!\!\sum_{k\in\mathrm{chain}(i)}\!\!\int\rho_k(\mathbf{r})\,\mathrm{d}\mathbf{r}\Big/N_i + p\!\int\!\mathrm{d}\mathbf{r}\right]\,,
+    \label{eq:si-gamma}
+\end{equation}
+where $F$ is the converged total (reduced) free energy, $\mu_i$ the bulk chemical potential of component $i$, and the leading $1/2$ accounts for the periodic cell's two equivalent interfaces.
+
+\section{Sequence-patterning order parameters}
+\label{si:kappa}
+
+$\kappa_\mathrm{seq}$ is the Das-Pappu/Sawle-Ghosh local charge-clustering parameter\cite{dasConformationsIntrinsicallyDisordered2013,sawleTheoreticalMethodCompute2015}, computed here exactly as originally defined and not re-derived.
+
+$\xi$ (main text Eq.~3) is this project's own windowed anti-palindrome order parameter,
+\begin{equation}
+    \xi = \frac{1}{\xi_\mathrm{max}(N,Q)}\sum_{j=1}^{N-w+1}\left(\sum_{i=j}^{j+w-1}\big(Z_i+Z_{N+1-i}\big)\right)^{\!2}\,,\qquad w=6\,,
+    \label{eq:si-xi}
+\end{equation}
+with $Q=\sum_iZ_i$ the sequence's net charge ($Q=0$ throughout the main text). $\xi_\mathrm{max}(N,Q)$ is not an analytic ceiling but the \emph{true} achievable maximum of the raw (unnormalized) sum in Eq.~\ref{eq:si-xi} for a $\pm1$-bead sequence of length $N$ and net charge $Q$, obtained by explicit construction over the mirror-pair slots $(i,N{+}1{-}i)$:
+\begin{itemize}
+    \item With $n_+=(N+Q)/2$ even, the maximizer is a strict palindrome: split the $N/2$ mirror-pair slots into $n_+/2$ slots matched $(+1,+1)$ and $n_-/2$ slots matched $(-1,-1)$, trying both block orderings (all-$+$ slots innermost vs.\ outermost) and keeping the larger raw sum.
+    \item With $n_+$ odd, no strict palindrome realizes the composition; $\lfloor n_+/2\rfloor$/$\lfloor n_-/2\rfloor$ slots are matched as above, and the one leftover $+1$ and one leftover $-1$ bead are forced into a single \emph{anti}-paired slot. Every combination of block ordering, anti-slot position, and anti-slot sign assignment is tried and the maximum kept.
+\end{itemize}
+This constructive procedure (not a closed-form formula) was confirmed directly to reproduce the true exhaustive-search maximum for every composition tested at $N\in\{8,12\}$, and to match or exceed $300{,}000$-shuffle random search at $N=20$ for every even $Q\in[-20,20]$ -- including exact agreement, for the net-neutral ($Q=0$) case, with the simpler analytic special case (the single-transition palindrome $[+1^{N/4},-1^{N/2},+1^{N/4}]$, when $N$ is divisible by 4) this reduces to. For the $N=50$ Das-Pappu sequences used throughout the main text, $n_+=25$ is odd, so the general (leftover-bead) construction above is the one actually used, not the simpler $N/4$ special case.
+
+\bibliography{literature/references/references}
+
+\end{document}

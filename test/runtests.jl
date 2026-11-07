@@ -6,4 +6,5 @@ using Test
 # every call as `IDPInterface.LS`, as test_LS_validation.jl itself does).
 include("test_sequences.jl")
 include("test_DFT_bulk.jl")
+include("test_donnan_bubble_pressure.jl")
 include("test_LS_validation.jl")
