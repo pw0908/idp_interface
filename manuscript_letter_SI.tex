@@ -1,6 +1,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Supporting Information for "Sequence Asymmetry Produces Interfacial
-%% Electrostatic Potentials in Biomolecular Condensates"
+%% Electrostatic Potentials in Polyampholytic Coacervates"
 %% Explicit LS-theory bulk EOS and classical DFT equations, numerical
 %% solution method, and the exact kappa_sym/kappa_sym_max definitions,
 %% all extracted directly from the implementation (Clapeyron.jl's LS.jl,
@@ -12,12 +12,17 @@
 \documentclass[journal=macl,manuscript=suppinfo,layout=onecolumn]{achemso}
 \usepackage[version=3]{mhchem}
 \usepackage{bm}
+\usepackage{soul}
+\usepackage{xcolor}
 
 \author{Pierre J. Walker}
 \email{pjwalker@caltech.edu}
 \affiliation{Division of Chemistry and Chemical Engineering, California Institute of Technology, Pasadena, California, USA}
 
-\title{Sequence Asymmetry Produces Interfacial Electrostatic Potentials in Biomolecular Condensates}
+\author{Zhen-Gang Wang}
+\affiliation{Division of Chemistry and Chemical Engineering, California Institute of Technology, Pasadena, California, USA}
+
+\title{Sequence Asymmetry Produces Interfacial Electrostatic Potentials in Polyampholytic Coacervates}
 
 \begin{document}
 \maketitle
@@ -32,48 +37,50 @@ Every bead, chain or small-ion, charged or neutral, is a hard sphere of the same
 \end{equation}
 with $\epsilon_r$ a constant (restricted-primitive-model, i.e.\ implicit-solvent) relative permittivity; a target $\ell_\mathrm{B}$ is converted to a temperature by inverting Eq.~\ref{eq:si-lB} at fixed $\epsilon_r$.
 
-% For the purposes of clarity consistency with the cDFT formalism, although this will not reflect how it is practically implemented, both the bulk and cDFT free energies should be written as reduced free energy densities, as presented in the manuscript. Similarly, while we decompose the implementation by neutral and ionic halves, when presenting it here, each term should be described individually (hard-sphere, chain and electrostatics). This will make it more accessible for non-experienced readers.
-\section{Bulk LS-theory equation of state}
+\section{LS theory equation of state}
 \label{si:bulk}
 
+The bulk residual free energy follows Zhang \textit{et al.}\cite{zhangSaltingOutSaltingInPolyelectrolyte2016}. For clarity and consistency with the spatial theory below, it is presented here as a reduced free energy density, $f_\mathrm{res}=\beta F_\mathrm{res}/V$, evaluated at the bulk group densities $\rho^\star_k$, and organized by physical term, hard-sphere, electrostatic, and chain, exactly as in the main text's Eq.~1, $f_\mathrm{res}=f_\mathrm{hs}+f_\mathrm{chain}+f_\mathrm{el}$.
 
-The bulk residual reduced Helmholtz energy per mole of chain/ion, $a_\mathrm{res}=\beta A_\mathrm{res}/\sum_c z_c$, follows Zhang \textit{et al.}\cite{zhangSaltingOutSaltingInPolyelectrolyte2016} and splits exactly as $a_\mathrm{res}=a_\mathrm{res}^\mathrm{neutral}+a_\mathrm{res}^\mathrm{ion}$, each evaluated at the same set of reduced group densities $\rho^\star_k$.
-
-\paragraph{Neutral half}
+\paragraph{Hard-sphere term.}
 \begin{align}
     f_\mathrm{hs} &= \frac{6\eta^2(4-3\eta)}{\pi(1-\eta)^2}\,, \label{eq:si-fhs}\\
-    g_\mathrm{hs} &= \frac{1}{1-\eta} + \frac{1}{2}\frac{3\eta}{(1-\eta)^2} + \frac{1}{4}\frac{2\eta^2}{(1-\eta)^3}\,, \label{eq:si-ghs}\\
-    a_\mathrm{res}^\mathrm{neutral} &= \frac{f_\mathrm{hs} + \sum_c \rho^\star_\mathrm{chain,c}\,(1-N_c)\ln g_\mathrm{hs}}{\sum_c \rho^\star_\mathrm{chain,c}}\,, \label{eq:si-aneutral}
+    g_\mathrm{hs} &= \frac{1}{1-\eta} + \frac{1}{2}\frac{3\eta}{(1-\eta)^2} + \frac{1}{4}\frac{2\eta^2}{(1-\eta)^3}\,, \label{eq:si-ghs}
 \end{align}
-where $\rho^\star_{\mathrm{chain},c}=N_\mathrm{A}\sigma^3 z_c/V$ is component $c$'s own (whole-chain) reduced density, $N_c$ its bead count, and $g_\mathrm{hs}$ the equal-diameter hard-sphere contact value (the same BMCSL-type correlation\cite{boublikHardSphereEquationState1970,mansooriEquilibriumThermodynamicProperties1971} used by the spatial DFT's chain term below, so the bulk model and the DFT it feeds stay mutually consistent). Eq.~\ref{eq:si-fhs}-\ref{eq:si-ghs} are the $\Gamma\to0$ (uncharged) limit of the full TPT1 bonding free energy; $(1-N_c)\ln g_\mathrm{hs}$ per chain is the standard Wertheim first-order perturbation result\cite{wertheimFluidsHighlyDirectional1984,wertheimFluidsHighlyDirectional1984a,wertheimFluidsHighlyDirectional1986,wertheimFluidsHighlyDirectional1986a} for $N_c-1$ tangent bonds.
+the equal-diameter, BMCSL-type\cite{boublikHardSphereEquationState1970,mansooriEquilibriumThermodynamicProperties1971} hard-sphere free energy density and contact pair-correlation value, respectively.
 
-\paragraph{Ion half (restricted-primitive-model Blum-MSA + charge-induced chain correction).}
-For equal-sized beads the Blum-MSA screening parameter\cite{blumMeanSphericalModel1975} has the closed form
+\paragraph{Electrostatic term.}
+For equal-sized beads the Blum-MSA screening parameter\cite{blumMeanSphericalModel1975} has the closed form 
 \begin{equation}
     \kappa_\mathrm{D} = \sqrt{4\pi\ell_\mathrm{B}\sum_k \rho^\star_k\,|Z_k|\,Z_k^2}\,,\qquad
     \Gamma = \frac{-1+\sqrt{1+2\kappa_\mathrm{D}}}{2}\,,
     \label{eq:si-GammaMSA}
 \end{equation}
-with $Z_k$ the integer valence of group $k$ (the $|Z_k|Z_k^2=|Z_k|^3$ combination is just $Z_k^2$ for a single-charge species but keeps the correct sign/magnitude convention for general integer charge). The MSA electrostatic free energy and the resulting shift in the chain term's bonded contact value (every bonded $\ln y_\mathrm{hs}$ pair picks up a $\Gamma$-dependent correction whose $g_\mathrm{hs}$-independent part survives after subtracting the $\Gamma=0$ reference) are
+with $Z_k$ the integer valence of group $k$ (the $|Z_k|Z_k^2=|Z_k|^3$ combination is just $Z_k^2$ for a single-charge species but keeps the correct sign/magnitude convention for general integer charge). The MSA electrostatic free energy density, and the associated charge-induced correction to each bonded pair's contact value (used by the chain term below), are
 \begin{align}
     f_\mathrm{el} &= -\frac{\Gamma^3}{\pi}\left(\frac{2}{3}+\Gamma\right)\,, \label{eq:si-fel}\\
-    \Delta &= \ell_\mathrm{B}\left(1 - \frac{1}{(1+\Gamma)^2}\right)\,, \label{eq:si-Delta}\\
-    a_\mathrm{res}^\mathrm{ion} &= \frac{f_\mathrm{el} + \sum_c \rho^\star_{\mathrm{chain},c}\,(1+2N_{\mathrm{pm},c}+N_{\mathrm{nc},c}-N_c)\,\Delta}{\sum_c \rho^\star_{\mathrm{chain},c}}\,, \label{eq:si-aion}
+    \Delta &= \ell_\mathrm{B}\left(1-\frac{1}{(1+\Gamma)^2}\right)\,. \label{eq:si-Delta}
 \end{align}
-where $N_{\mathrm{pm},c}$ counts component $c$'s own bonds between unlike-charge beads and $N_{\mathrm{nc},c}$ its bonds involving a neutral bead (a same-charge bond contributes to neither). The composite model's residual free energy is $a_\mathrm{res}=a_\mathrm{res}^\mathrm{neutral}+a_\mathrm{res}^\mathrm{ion}$, which together with the standard ideal/translational term $\beta f_\mathrm{id}(\rho)=\sum_k\rho_k[\ln(\rho_k\Lambda_k^3)-1]$ gives the main text's four-term decomposition, Eq.~1.
+
+\paragraph{Chain term.}
+Tangent-bead connectivity contributes a single first-order thermodynamic perturbation theory (TPT1) correction per bond\cite{wertheimFluidsHighlyDirectional1984,wertheimFluidsHighlyDirectional1984a,wertheimFluidsHighlyDirectional1986,wertheimFluidsHighlyDirectional1986a}, combining the neutral bonded contact value $g_\mathrm{hs}$ (Eq.~\ref{eq:si-ghs}) with the charge-induced shift $\Delta$ (Eq.~\ref{eq:si-Delta}) that a bond picks up once beads are charged:
+\begin{equation}
+    f_\mathrm{chain} = \sum_c \rho^\star_{\mathrm{chain},c}\Big[(1-N_c)\ln g_\mathrm{hs} + \big(1+2N_{\mathrm{pm},c}+N_{\mathrm{nc},c}-N_c\big)\,\Delta\Big]
+    \label{eq:si-fchain}
+\end{equation}
+where $\rho^\star_{\mathrm{chain},c}=N_\mathrm{A}\sigma^3 z_c/V$ is component $c$'s own (whole-chain) reduced density, $N_c$ its bead count, $N_{\mathrm{pm},c}$ its own bonds between unlike-charge beads, and $N_{\mathrm{nc},c}$ its bonds involving a neutral bead (a same-charge bond contributes to neither); $(1-N_c)\ln g_\mathrm{hs}$ per chain is the standard Wertheim result for $N_c-1$ tangent bonds in the uncharged limit, and the $\Delta$ term is the correction each bonded pair's contact value picks up once $\Gamma\neq0$.
+
+Together with the ideal (translational) term $\beta f_\mathrm{id}(\rho)=\sum_k\rho_k[\ln(\rho_k\Lambda_k^3)-1]$, Eqs.~\ref{eq:si-fhs}, \ref{eq:si-fel}, and \ref{eq:si-fchain} reproduce exactly the main text's four-term decomposition of the reduced free energy density, Eq.~1: $f=f_\mathrm{id}+f_\mathrm{hs}+f_\mathrm{chain}+f_\mathrm{el}$.
 
 \section{Classical density functional theory}
 \label{si:dft}
-% General notes on the formalism used in cDFT. The propagators are considered separately from each individual free energy functional. The self-consistent equation should look like:
-% \rho_k(r)=\rho_i^bulk \exp{-\beta(dF_res_d_rho - mu_res_i^bulk - Z_k e\psi(r)} I_{1,k}(r)*I_{2,k}
-% where i is the index for molecule i which k is within. I_{1,k} and I_{2,k} are the forward and reverse propagators; although we use a more general implementation. Reflect these changes in the main text.
 
-The spatial profiles $\rho_k(\mathbf{r})$ solve the Euler-Lagrange fixed-point equation already given in the main text (Eq.~2), reproduced here for completeness:
+The spatial profiles $\rho_k(\mathbf{r})$ solve the Euler-Lagrange fixed-point equation already given in the main text (Eq.~2), reproduced here:
 \begin{equation}
-    \rho_k(\mathbf{r}) = \rho_i^\mathrm{bulk}\exp\!\left[-\beta\left(\frac{\delta F_\mathrm{res}[\rho]}{\delta\rho_k(\mathbf{r})} - \mu_{\mathrm{res},i}^\mathrm{bulk} - Z_k e\,\psi(\mathbf{r})\right)\right]\,.
+    \rho_k(\mathbf{r}) = \rho_i^\mathrm{bulk}\,\,\exp\!\left[-\beta\left(\frac{\delta F_\mathrm{res}[\rho]}{\delta\rho_k(\mathbf{r})} - \mu_{\mathrm{res},i}^\mathrm{bulk} - Z_k e\,\psi(\mathbf{r})\right)\right]\,G_k^\mathrm{p}(\mathbf{r})\!\!\prod_{\alpha\,:\,k\to\alpha}\!\! G_{k\to\alpha}^\mathrm{c}(\mathbf{r})\,,
     \label{eq:si-fixedpoint}
 \end{equation}
-$F_\mathrm{res}[\rho]$ is the local functional whose three pieces are detailed below (hard-sphere, chain, and a local-density electrostatic correlation correction); the mean-field Coulomb term $-Z_ke\psi(\mathbf{r})$ is kept separate and computed by an explicit Poisson solve (described below), exactly mirroring the bulk model's own split between the MSA correlation free energy (Eq.~\ref{eq:si-fel}) and the (implicit, bulk-exactly-zero) mean electric field.
+where $i$ indexes the molecule (chain or small ion) that bead $k$ belongs to, $\rho_i^\mathrm{bulk}$ and $\mu_{\mathrm{res},i}^\mathrm{bulk}$ are, respectively, the bulk number density and bulk residual chemical potential of component $i$ (obtained from the bulk LS equation of state described above; every bead belonging to a given chain shares the same bulk density, since each bead identity occurs exactly once per chain), and $F_\mathrm{res}$ is the residual free energy functional promoted directly from its bulk LS-theory form. $G_k^\mathrm{p}(\mathbf{r})$ and $G_{k\to\alpha}^\mathrm{c}(\mathbf{r})$ are, respectively, the top-down and bottom-up chain propagators defined below (Eqs.~\ref{eq:si-Gc}-\ref{eq:si-Gp}). For a free, unbonded small ion this product is empty and $G_k^\mathrm{p}\equiv1$, so Eq.~\ref{eq:si-fixedpoint} reduces to the ordinary ion-only fixed-point relation. The mean-field Coulomb term $-Z_ke\psi(\mathbf{r})$ is kept separate and computed by an explicit Poisson solve (described below), exactly mirroring the bulk model's own split between the MSA correlation free energy (Eq.~\ref{eq:si-fel}) and the (implicit, bulk-exactly-zero) mean electric field.
 
 \subsection{Hard-sphere term: fundamental measure theory}
 \label{si:fmt}
@@ -89,31 +96,6 @@ where $\omega_k^{(2)}(\mathbf{r})=\delta(d_k/2-|\mathbf{r}|)$, $\omega_k^{(3)}(\
     \label{eq:si-Phihs}
 \end{equation}
 
-\subsection{Chain term: TPT1 density functional via a recursive propagator}
-\label{si:chain}
-
-The exact sequence of tangent bonds in each chain is resolved by the Yu-Wu TPT1 density functional\cite{yuDensityFunctionalTheory2002} for branched/linear bonded hard-sphere chains, specialized here to a linear sequence (every chain bead has at most two bonded neighbors). Writing the chain's own bond graph as a rooted tree, define the per-bond convolution kernel
-\begin{equation}
-    \omega_{jk}(\mathbf{r}) = \frac{\delta(|\mathbf{r}|-\sigma_{jk})}{4\pi\sigma_{jk}^2}\,,\qquad \sigma_{jk}=\tfrac{1}{2}(d_j+d_k)=\sigma\,,
-    \label{eq:si-bondkernel}
-\end{equation}
-the normalized spherical-shell delta function at the bond length. Two recursive propagators are built over the tree: a bottom-up cavity-correlation function $G_{k\to\alpha}^\mathrm{c}(\mathbf{r})$, for every bead $\alpha$ one bond further from the root than its parent $k$,
-\begin{equation}
-    G_{k\to\alpha}^\mathrm{c}(\mathbf{r}) = \int\!\mathrm{d}\mathbf{r}'\,\omega_{k\alpha}(\mathbf{r}-\mathbf{r}')\,\exp\!\left[-\beta\frac{\delta F_\mathrm{res}^\mathrm{local}}{\delta\rho_\alpha(\mathbf{r}')}\right]\prod_{\beta\in\mathrm{children}(\alpha)} G_{\alpha\to\beta}^\mathrm{c}(\mathbf{r}')\,,
-    \label{eq:si-Gc}
-\end{equation}
-evaluated from the leaves inward, and a top-down propagator $G_k^\mathrm{p}(\mathbf{r})$ (root: $G^\mathrm{p}\equiv1$),
-\begin{equation}
-    G_k^\mathrm{p}(\mathbf{r}) = \int\!\mathrm{d}\mathbf{r}'\,\omega_{lk}(\mathbf{r}-\mathbf{r}')\,\exp\!\left[-\beta\frac{\delta F_\mathrm{res}^\mathrm{local}}{\delta\rho_l(\mathbf{r}')}\right]G_l^\mathrm{p}(\mathbf{r}')\prod_{\substack{\alpha\in\mathrm{children}(l)\\\alpha\neq k}} G_{l\to\alpha}^\mathrm{c}(\mathbf{r}')\,,
-    \label{eq:si-Gp}
-\end{equation}
-evaluated from the root outward ($l$: bead $k$'s own parent). Here $\delta F_\mathrm{res}^\mathrm{local}/\delta\rho_\alpha$ is the non-chain (hard-sphere $+$ electrostatic, see below) part of the functional derivative. The chain term's own contribution to the total functional derivative appearing in Eq.~\ref{eq:si-fixedpoint} is then, for each bead $j$ bonded to parent-side neighbor set as above,
-\begin{equation}
-    \beta\frac{\delta F_\mathrm{chain}}{\delta\rho_j(\mathbf{r})} = -\ln G_j^\mathrm{p}(\mathbf{r}) - \sum_{\alpha\,:\,j\to\alpha} \ln G_{j\to\alpha}^\mathrm{c}(\mathbf{r})\,,
-    \label{eq:si-chainderiv}
-\end{equation}
-summed over every bead $\alpha$ one bond farther from the root than $j$. For a free (unbonded) ion this sum is empty and $G^\mathrm{p}\equiv1$, so Eq.~\ref{eq:si-chainderiv} vanishes identically, consistent with the bulk limit. Each convolution in Eqs.~\ref{eq:si-Gc}-\ref{eq:si-Gp} is again evaluated in Fourier space using the closed-form transform of Eq.~\ref{eq:si-bondkernel}, $\hat\omega_{jk}(\mathbf{k})=\mathrm{sinc}(|\mathbf{k}|\sigma_{jk})$, with an isotropic Lanczos $\sigma$-factor ($\mathrm{sinc}(|\mathbf{k}|/k_\mathrm{Nyq})$) applied to suppress Gibbs-phenomenon ringing from this genuinely discontinuous real-space kernel at the grid's own resolution limit.
-
 \subsection{Electrostatic term: local MSA correlation correction and the mean-field potential}
 \label{si:elDFT}
 
@@ -122,7 +104,49 @@ The charged part of $F_\mathrm{res}$ is a local-density approximation: at each p
     \tilde\rho^\star_k(\mathbf{r}) = \int\!\mathrm{d}\mathbf{r}'\,\rho_k(\mathbf{r}')\,\omega^{(0)}_{k,w}(\mathbf{r}-\mathbf{r}')\,,\qquad w_k = \frac{\sigma}{2}+\frac{1}{\kappa_\mathrm{D}^\mathrm{bulk}}\,,
     \label{eq:si-smoothed}
 \end{equation}
-i.e.\ the same $n_0$-type weight as Eq.~\ref{eq:si-weighted} but with a width equal to the ion radius plus the bulk Debye-MSA screening length, $\kappa_\mathrm{D}^\mathrm{bulk}$ evaluated once from the reference (dense-phase) bulk densities. This gives $\Gamma(\mathbf{r})$, $f_\mathrm{el}(\mathbf{r})$ (Eq.~\ref{eq:si-fel}) and $\Delta(\mathbf{r})$ (Eq.~\ref{eq:si-Delta}) as local fields; the per-bond chain correction becomes $-\tfrac{1}{2}\rho_k(\mathbf{r})\,s_{kl}\,\Delta(\mathbf{r})$ summed over each bonded pair $(k,l)$, with $s_{kl}=+1$ for a same-charge bond, $-1$ for an unlike-charge bond, and $0$ if either bead is neutral (reducing to the bulk's $(1+2N_\mathrm{pm}+N_\mathrm{nc}-N)\Delta$ per chain in the uniform limit).
+i.e.\ the same $n_0$-type weight as Eq.~\ref{eq:si-weighted} but with a width equal to the ion radius plus the bulk Debye screening length, $\kappa_\mathrm{D}^\mathrm{bulk}$ evaluated once from the reference (dense-phase) bulk densities. This gives $\Gamma(\mathbf{r})$, $f_\mathrm{el}(\mathbf{r})$ (Eq.~\ref{eq:si-fel}) and $\Delta(\mathbf{r})$ (Eq.~\ref{eq:si-Delta}) as local fields.
+
+\subsection{Chain term}
+\label{si:chain}
+Define the weighted densities
+\begin{equation}
+    \zeta_2(\mathbf{r}) = \frac{1}{8}\sum_i \frac{\bar\rho_i(\mathbf{r})}{d_i}\,,\qquad
+    \zeta_3(\mathbf{r}) = \frac{1}{8}\sum_i \bar\rho_i(\mathbf{r})
+    \label{eq:si-zeta}
+\end{equation}
+where $\bar\rho_i(\mathbf{r})=\int\!\mathrm{d}\mathbf{r}'\,\rho_i(\mathbf{r}')\,\omega_i^{(d)}(\mathbf{r}-\mathbf{r}')$ denotes the bead density smoothed with a weight of width equal to the \emph{full} bead diameter $d_i$, since two tangent beads sit exactly one diameter apart. For each directed bond $(j,k)$, the spatial generalization of the bulk hard-sphere contact value (Eq.~\ref{eq:si-ghs}) is then
+\begin{equation}
+    y_{jk}^\mathrm{hs}(\mathbf{r}) = \frac{1}{1-\zeta_3(\mathbf{r})} + \frac{3r_{jk}\,\zeta_2(\mathbf{r})}{\big(1-\zeta_3(\mathbf{r})\big)^2} + \frac{2r_{jk}^2\,\zeta_2(\mathbf{r})^2}{\big(1-\zeta_3(\mathbf{r})\big)^3}\,,\qquad r_{jk}=\frac{d_jd_k}{d_j+d_k}\,,
+    \label{eq:si-yhs}
+\end{equation}
+and the neutral direct bonding free energy is
+\begin{equation}
+    F_\mathrm{chain}^\mathrm{neutral}[\rho] = -k_\mathrm{B}T\!\!\sum_{(j,k)\,\mathrm{bonds}}\int\!\mathrm{d}\mathbf{r}\,\frac{\rho_j(\mathbf{r})}{2}\,\ln y_{jk}^\mathrm{hs}(\mathbf{r})\,.    \label{eq:si-fbondneutral}
+\end{equation}
+The charge-induced correction mirrors the bulk chain term's own $\Delta$ piece exactly, using the same local $\Delta(\mathbf{r})$ already introduced in the electrostatic term: 
+
+\begin{equation}
+   F_\mathrm{chain}^\mathrm{ion}[\rho]=-\sum_{(k,l)\,\mathrm{bonds}}\int\!\mathrm{d}\mathbf{r}\,\frac{\rho_j(\mathbf{r})}{2}\,s_{kl}\,\Delta(\mathbf{r})\,,
+\end{equation} 
+with $s_{kl}=+1$ for a same-charge bond, $-1$ for an unlike-charge bond, and $0$ if either bead is neutral.
+
+\subsection{Connectivity: recursive propagator.}
+The exact sequence of tangent bonds in each chain is resolved by the Yu-Wu TPT1 density functional\cite{yuDensityFunctionalTheory2002} for branched/linear bonded hard-sphere chains, specialized here to a linear sequence (every chain bead has at most two bonded neighbors). Writing the chain's own bond graph as a rooted tree, define the per-bond convolution kernel
+\begin{equation}
+    \omega_{jk}(\mathbf{r}) = \frac{\delta(|\mathbf{r}|-\sigma_{jk})}{4\pi\sigma_{jk}^2}\,,\qquad \sigma_{jk}=\tfrac{1}{2}(d_j+d_k)=\sigma\,,
+    \label{eq:si-bondkernel}
+\end{equation}
+the normalized spherical-shell delta function at the bond length. Two recursive propagators are built over the tree: a bottom-up cavity-correlation function $G_{k\to\alpha}^\mathrm{c}(\mathbf{r})$, for every bead $\alpha$ one bond further from the root than its parent $k$,
+\begin{equation}
+    G_{k\to\alpha}^\mathrm{c}(\mathbf{r}) = \int\!\mathrm{d}\mathbf{r}'\,\omega_{k\alpha}(\mathbf{r}-\mathbf{r}')\,\exp\!\left[-\beta\frac{\delta F_\mathrm{res}}{\delta\rho_\alpha(\mathbf{r}')}\right]\prod_{\beta\in\mathrm{children}(\alpha)} G_{\alpha\to\beta}^\mathrm{c}(\mathbf{r}')\,,
+    \label{eq:si-Gc}
+\end{equation}
+evaluated from the leaves inward, and a top-down propagator $G_k^\mathrm{p}(\mathbf{r})$ (root: $G^\mathrm{p}\equiv1$),
+\begin{equation}
+    G_k^\mathrm{p}(\mathbf{r}) = \int\!\mathrm{d}\mathbf{r}'\,\omega_{lk}(\mathbf{r}-\mathbf{r}')\,\exp\!\left[-\beta\frac{\delta F_\mathrm{res}}{\delta\rho_l(\mathbf{r}')}\right]G_l^\mathrm{p}(\mathbf{r}')\prod_{\substack{\alpha\in\mathrm{children}(l)\\\alpha\neq k}} G_{l\to\alpha}^\mathrm{c}(\mathbf{r}')\,,
+    \label{eq:si-Gp}
+\end{equation}
+evaluated from the root outward ($l$: bead $k$'s own parent). Here $\delta F_\mathrm{res}/\delta\rho_\alpha$ is the full functional derivative that enters the main fixed-point equation (Eq.~\ref{eq:si-fixedpoint}).
 
 \subsection{Mean-field electrostatic potential}
 \label{si:poisson}
